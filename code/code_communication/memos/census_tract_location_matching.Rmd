@@ -1,0 +1,86 @@
+---
+title: "census_tract_location_matching"
+author: "Claire Morton"
+date: "10/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(tigris)
+```
+
+## Intro
+
+I noticed some mismatches between CES tract labels and actual census tract labels. Needless to say, this is an issue, so I'm making this document to explore and make sure that I have the right tracts for matching the external census data to CES 4.0 scores in order to make a CES recalculated score.
+
+```{r load_data}
+tract <- tracts(
+  state = "CA",
+  year = 2019
+) %>%
+  select(STATEFP, COUNTYFP, TRACTCE, GEOID, geometry)
+tract_137000_2019 <- tract %>%
+  filter(TRACTCE == "137000")
+tract_800204_2019 <- tract %>%
+  filter(TRACTCE == "800204")
+```
+
+
+```{r load_data2}
+tract_2010 <- tracts(
+  state = "CA",
+  year = 2010
+) 
+tract_800204_2010 <- tract_2010 %>%
+  filter(TRACTCE10 == "800204")
+tract_930401_2010 <- tract_2010 %>%
+  filter(TRACTCE10 == "930401")
+```
+
+```{r map}
+map_a <- ggplot(tract_137000_2019) + 
+  geom_sf() +
+  ggtitle ("Tract 137000, 2019 Tracts")
+map_b <- ggplot(tract_800204_2019) + 
+  geom_sf() +
+  ggtitle ("Tract 800204, 2019 Tracts")
+map_c <- ggplot(tract_930401_2010) + 
+  geom_sf() +
+  ggtitle ("Tract 930401, 2010 Tracts")
+map_d <- ggplot(tract_800204_2010) + 
+  geom_sf() +
+  ggtitle ("Tract 800204, 2010 Tracts")
+ggarrange (map_a, map_b, map_c, map_d)
+```
+
+The census released a statement (https://www2.census.gov/geo/pdfs/reference/Geography_Notes.pdf, page 6) 
+that tract 137000 was erroneously deleted from the 2010 census. So I think what happened is that 
+CES used the 2010 CES tracts, with the tract error, to create CES. This explains why they have tract 800204 and 930401 in the way
+shown in the 2010 data. But, when I pulled tract data, I used 2019 (tracts shouldn't have changed from 2010-2019). But they had
+changed, because the census caught their mistake. 
+
+In 2010, tract "930401" and teh top half of tract "800204" were split up. They should be one tract, tract 137000. But tract 137000
+was deleted in the 2010 census. This split means that CES erroneously relates the data in actual tract 137000 to just a part of that
+tract (which it labels 930401), and it includes only the data from actual tract 800204 in an area it says includes some of actual
+tract 137000, which CES calls tract 800204. This mistake means that while CES and the census have the same *number* of tracts from 
+2010-2019, their *makeup* is different geographically.
+
+Indeed, the above document states: tract 137000 was erroneously deleted, tract 930401 should be entirely in tract 137000 (and shouldn't
+exist), and tract 800204 erroneously contains some of tract 137000.
+
+This mistake in the census, which propagated to CES, means that their *map* is incorrect. However, the *data* is fine. Tract 930401 in CES
+data contains the exact right data for actual tract 137000 (population of 5067 in both CES data and my pulled data from the 2019 ACS 5-year
+summary), and the CES tract 800204 contain the correct data for actual tract 800204 (population of 4495 in both CES data and my pulled data 
+from 2019 ACS 5-year summary). So the fix that I need to make is, in the CES data, to rename tract 930401 to be tract 137000, and keep tract 
+800204 as is, and, when I create maps of the original or recalculated CES, to be sure to use 2019 census tracts.
+
+
+```{r}
+setdiff(tract_2010$TRACTCE10, tract$TRACTCE)
+setdiff(tract$TRACTCE, tract_2010$TRACTCE10)
+```
+

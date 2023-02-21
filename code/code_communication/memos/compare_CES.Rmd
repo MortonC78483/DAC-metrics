@@ -1,0 +1,223 @@
+---
+title: "compare_CES"
+author: "Claire Morton"
+date: "10/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tigris)
+library(sf)
+library(ggpubr)
+```
+
+## Introduction
+
+This document will produce some introductory figures about CalEnviroScreen and race/ethnicity, and CalEnviroScreen and oil wells. It will compare original and adjusted CalEnviroScreen scores, and conduct a statistical test to determine whether the two sets of scores are meaningfully different.
+
+```{r loaddata}
+ces <- read.csv("../../data/data_interim/recalculated_ces_scores.csv") %>%
+  mutate(Census.Tract = paste0("0", Census.Tract),
+         propHispanicOrNonWhite = propHispanicOrNonWhite *100,
+         propBlack = Black/Total * 100,
+         propHispanic = Hispanic/Total * 100,
+         propAIAN = AmericanIndianAlaskaNative/Total * 100)
+tract <- tracts(
+  state = "CA",
+  year = 2019
+) %>%
+  select(STATEFP, COUNTYFP, TRACTCE, GEOID, geometry)
+```
+
+```{r cleandata}
+ces_sf <- merge(tract, ces, by.x = "GEOID", by.y = "Census.Tract")
+ces_sf_simpl <- st_simplify(ces_sf,  dTolerance = 100)
+```
+
+Map CES and adjusted CES scores
+```{r maps}
+ggplot(ces_sf_simpl, aes(fill = CES.4.0.Percentile))+
+  geom_sf(size = 0)+
+  scale_fill_gradient(low = "yellow", high = "red")
+
+ggplot(ces_sf_simpl, aes(fill = CES.Percentile.Adjusted))+
+  geom_sf(size = 0)+
+  scale_fill_gradient(low = "yellow", high = "red")
+
+ggplot(ces_sf_simpl, aes(fill = CES.Percentile.Adjusted-CES.4.0.Percentile))+
+  geom_sf(size = 0)+
+  scale_fill_gradient2(low = "red", mid = "white", high = "blue")
+```
+
+Now, we zoom in to our areas of interest within San Francisco, LA, and Fresno
+```{r zoom}
+sanfrancisco_crop <- st_crop(ces_sf, xmin = -122.5274, xmax = -122.3134,
+                                 ymin = 37.6827, ymax = 37.84)
+fresno_crop <- st_crop(ces_sf, xmin = -119.96087, xmax = -119.601115,
+                                 ymin = 36.674969, ymax = 36.889648)
+losangeles_crop <- st_crop(ces_sf, xmin = -118.5505, xmax = -117.831,
+                           ymin = 33.6836, ymax = 34.2203)
+
+ggplot(sanfrancisco_crop, aes(fill = CES.Percentile.Adjusted-CES.4.0.Percentile))+
+  geom_sf(size = 0)+
+  scale_fill_gradient2(low = "red", mid = "white", high = "blue")
+ggplot(fresno_crop, aes(fill = CES.Percentile.Adjusted-CES.4.0.Percentile))+
+  geom_sf(size = 0)+
+  scale_fill_gradient2(low = "red", mid = "white", high = "blue")
+ggplot(losangeles_crop, aes(fill = CES.Percentile.Adjusted-CES.4.0.Percentile))+
+  geom_sf(size = 0)+
+  scale_fill_gradient2(low = "red", mid = "white", high = "blue")
+```
+
+From this, we can see that the percentile of larger rural tracts tended to decrease on including oil wells and race/ethnicity, while the percentile of smaller tracts and tracts in the central valley tended to increase.
+
+Now, we want to understand what factor (adding oil wells or adding race/ethnicity) is driving the change in percentiles that is observed in the data.
+```{r drivers_of_change}
+ggplot(ces_sf_simpl, aes(x = propHispanicOrNonWhite, y = CES.Percentile.Adjusted))+
+  geom_point(color = "red", alpha = .5) +
+  geom_point(aes(x = propHispanicOrNonWhite, y = CES.4.0.Percentile), color = "blue", alpha = .5)
+
+ggplot(ces_sf_simpl, aes(x = propHispanicOrNonWhite, y = CES.Percentile.Adjusted - CES.4.0.Percentile)) +
+  geom_point()
+
+ggplot(ces_sf_simpl, aes(x = Well.Count.Pctl, y = CES.Percentile.Adjusted - CES.4.0.Percentile)) +
+  geom_point()
+
+ggplot(ces_sf_simpl, aes(x = Well.Count.Pctl, y = Hispanic.or.NonWhite.Pctl)) +
+  geom_point()
+
+ggplot(ces_sf_simpl, aes(x = Well.Count.Pctl, y = CES.4.0.Percentile)) +
+  geom_point()
+```
+```{r area_calculate}
+ces_sf_simpl$area = as.vector(st_area(ces_sf_simpl))
+
+ggplot(ces_sf_simpl, aes(x = log(area), y = CES.Percentile.Adjusted - CES.4.0.Percentile)) +
+  geom_point()+
+  geom_smooth(method = "lm")
+
+ggplot(ces_sf_simpl, aes(x = log(area), y = propHispanicOrNonWhite)) +
+  geom_point()+
+  geom_smooth(method = "lm")
+
+ggplot(ces_sf_simpl%>%filter(Well.Count.Pctl != 0), aes(x = log(area), y = Well.Count.Pctl)) +
+  geom_point()+
+  geom_smooth(method = "lm")
+
+
+```
+
+Now, we produce figures similar to this national-level analysis:https://grist.org/equity/climate-and-economic-justice-screening-tool-race/ 
+
+We plot the percent of census tracts identified as disadvantaged and not disadvantaged by CES by tract population percent that is not white non-hispanic
+```{r grist_func}
+grist_map <- function(data, var_percentile, var_to_plot, cut_points = seq(0, 100, 5), cut_labels = seq(5, 100, 5)) {
+  ces_to_plot <- ces %>%
+    select(var_percentile, var_to_plot)%>%
+    mutate(dis = ifelse(ces[,var_percentile]>=75, 1, 0)) 
+  ces_to_plot <- ces_to_plot %>%
+    mutate(cut = cut(x = ces_to_plot[,var_to_plot], 
+                     cut_points, 
+                     include.lowest = TRUE,
+                     labels = cut_labels)) %>%
+    group_by(cut) %>%
+    summarize(mean = mean(dis, na.rm = T), 
+              n_dis = sum(dis, na.rm = T), 
+              n_not_dis = n() - sum(dis, na.rm = T), 
+              n = n()) %>%
+    filter(!is.na(cut))
+  
+  plot_a = ggplot(ces_to_plot) +
+    geom_bar(aes(x = cut, y = mean), stat = "identity") +
+    xlab("")+
+    ylab("Proportion of tracts in top 25% of CES") +
+    theme_classic()
+  
+  plot_b = ggplot(ces_to_plot) +
+    geom_bar(aes(x = cut, y = n_dis), stat = "identity") +
+    xlab("")+
+    ylab("Number of tracts in top 25% of CES") +
+    theme_classic()
+  
+  ggarrange(plot_a, plot_b)
+}
+```
+
+```{r plots}
+grist_map(ces, "CES.4.0.Percentile", "propHispanicOrNonWhite")
+grist_map(ces, "CES.Percentile.Adjusted", "propHispanicOrNonWhite")
+
+grist_map(ces, "CES.4.0.Percentile", "propBlack")
+grist_map(ces, "CES.Percentile.Adjusted", "propBlack")
+
+grist_map(ces, "CES.4.0.Percentile", "propHispanic")
+grist_map(ces, "CES.Percentile.Adjusted", "propHispanic")
+
+grist_map(ces, "CES.4.0.Percentile", "propAIAN")
+grist_map(ces, "CES.Percentile.Adjusted", "propAIAN")
+```
+
+When we plot the percent of census tracts identified as disadvantaged and not disadvantaged by CES by tract population percent that is not non-Hispanic white, we see that the distribution with CES actually doesn't look much different than the adjusted CES distribution. Both are prioritizing tracts with higher proportions of POC. So, even though tracts move around ~1 percentile point (see below), we actually aren't seeing huge differences in the racial composition of tracts that move from one "bin" here to another. This shows that if current CES incorporated race/ethnicity in the same way that CES 1.0 did, their statewide tract rankings would be pretty different, but they would still be prioritizing tracts with many POC people in pretty much the same way they are now.
+
+```{r diff}
+print(paste0("The average percentile difference among California census tracts between adjusted and
+             non-adjusted CES scores. 1 percentile change is equivaluent to about 8 rank changes: ",
+             mean(abs(ces$`CES.4.0.Percentile` - ces$`CES.Percentile.Adjusted`), na.rm = T)))
+
+ces_scores_top25 <- ces %>%
+  filter(`CES.4.0.Percentile` >= 75)
+
+ces_scores_top25_adj <- ces %>%
+  filter(`CES.Percentile.Adjusted` >= 75)
+
+print(paste0("The number of tracts that moved to the top 25th percentile in the adjusted score: ",
+             length(setdiff(ces_scores_top25_adj$Census.Tract, ces_scores_top25$Census.Tract)), 
+             " out of ", nrow(tract)))
+
+removed_top25 <- ces_scores_top25 %>%
+  filter(Census.Tract %in% 
+           setdiff(ces_scores_top25$Census.Tract, ces_scores_top25_adj$Census.Tract))
+new_top25 <- ces_scores_top25_adj %>%
+  filter(Census.Tract %in%
+           setdiff(ces_scores_top25_adj$Census.Tract, ces_scores_top25$Census.Tract))
+
+print(paste0("The number of people in tracts that moved to the top 25th percentile in the adjusted score: ",
+             sum(new_top25$Total.Population)))
+print(paste0("The number of people in tracts that moved out of the top 25th percentile in the adjusted score: ",
+             sum(removed_top25$Total.Population)))
+```
+
+Running a Wilcoxon Signed Rank Test to test whether the original CES and Adjusted CES are different
+```{r wilcox}
+library(MASS)
+wilcox.test(ces$`CES.4.0.Percentile`, ces$`CES.Percentile.Adjusted`, paired = TRUE)
+```
+
+
+## Mapping the communities that move to meet DAC criteria
+```{r map_new_dacs}
+new_top25_sf <- ces_sf %>%
+  filter(`CES.Percentile.Adjusted` >= 75) %>%
+  filter(GEOID %in%
+           setdiff(ces_scores_top25_adj$Census.Tract, ces_scores_top25$Census.Tract))
+ces_sf['new_top25'] = ifelse(ces_sf$GEOID %in% new_top25_sf$GEOID, 1, 0)
+
+sanfrancisco_crop <- st_crop(ces_sf, xmin = -122.5274, xmax = -122.3134,
+                                 ymin = 37.6827, ymax = 37.84)
+fresno_crop <- st_crop(ces_sf, xmin = -119.96087, xmax = -119.601115,
+                                 ymin = 36.674969, ymax = 36.889648)
+losangeles_crop <- st_crop(ces_sf, xmin = -118.5505, xmax = -117.831,
+                           ymin = 33.6836, ymax = 34.2203)
+
+ggplot(sanfrancisco_crop, aes(fill = as.factor(new_top25)))+
+  geom_sf(size = .1)
+
+ggplot(fresno_crop, aes(fill = as.factor(new_top25)))+
+  geom_sf(size = .1)
+
+ggplot(losangeles_crop, aes(fill = as.factor(new_top25)))+
+  geom_sf(size = .1)
+```
+

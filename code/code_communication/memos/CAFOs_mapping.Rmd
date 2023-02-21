@@ -1,0 +1,65 @@
+---
+title: "CAFOs_mapping"
+author: "Claire Morton"
+date: "11/21/2022"
+output: html_document
+---
+
+This script will map CAFO data and implement an example method for ranking tract CAFO exposure.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tigris)
+library(tidyverse)
+library(sf)
+```
+
+```{r loaddata}
+cafo <- read_csv("../../data/CAFO_data/Regualted_Facility_Report_Detail.csv")
+cafos_scores <- read_csv("../../data/data_interim/census_tract_cafos.csv")
+
+tract <- tracts(
+  state = "CA",
+  year = 2019
+) %>%
+  select(STATEFP, COUNTYFP, TRACTCE, GEOID, geometry)
+
+ca <- states() %>%
+  filter(STATEFP == "06")
+```
+
+```{r cleandata}
+cafo <- cafo %>%
+  rename("Population" = "Cafo Population") %>%
+  mutate(Latitude = as.numeric(Latitude),
+         Longitude = as.numeric(Longitude),
+         Population = as.numeric(Population)) %>%
+  filter(!is.na(Latitude) & !is.na(Longitude) & !is.na(Population)) %>%
+  select(Latitude, Longitude, Population) %>%
+  mutate(Category = ifelse(Population >= 700, "Large", 
+                           ifelse(Population >= 200, "Medium", "Small")))
+```
+
+```{r map_locations, echo=FALSE}
+# create map of CAFO locations
+cafo_sf <- sf::st_as_sf(cafo, coords = c("Longitude", "Latitude"), crs = st_crs(ca))
+
+ggplot(cafo_sf) +
+  geom_sf(data = ca) +
+  geom_sf(data = cafo_sf, alpha = .1)
+```
+```{r map_locations, echo=FALSE}
+# distribution of number of animals at each CAFO
+hist(cafo$Population, breaks = 50)
+summary(as.factor(cafo$Category))
+```
+
+```{r map_cafo_scores, echo=FALSE}
+# map of CAFO percentile ranks
+cafos_scores_sf <- merge(tract, cafos_scores)
+
+ggplot(cafos_scores_sf) +
+  geom_sf(aes(fill = percentile_cafo_score), lwd = .1)
+```
+

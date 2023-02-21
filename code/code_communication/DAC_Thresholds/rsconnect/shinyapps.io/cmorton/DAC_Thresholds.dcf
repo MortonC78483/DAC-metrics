@@ -1,0 +1,13 @@
+name: DAC_Thresholds
+title: DAC_Thresholds
+username:
+account: cmorton
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 7581359
+bundleId: 6496445
+url: https://cmorton.shinyapps.io/DAC_Thresholds/
+when: 1668041249.5643
+lastSyncTime: 1668041249.56438
+asMultiple: FALSE
+asStatic: FALSE

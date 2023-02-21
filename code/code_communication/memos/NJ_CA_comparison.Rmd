@@ -1,0 +1,129 @@
+---
+title: "NJ_CA_comparison"
+author: "Claire Morton"
+date: "11/10/2022"
+output: html_document
+---
+
+This script will compare the thresholds in the New Jersey law with the potential thresholds for the California law, to try to 
+understand how comparable the two are (and how to set up potential CA thresholds that are more comparable to CES)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+Load data
+
+```{r load_data}
+nj <- read_csv("../../data/data_interim/NJ_census_block_group.csv")
+ca <- read_csv("../../data/data_interim/CA_census_block_group.csv")
+```
+
+```{r thresh}
+ca_pov <- .35
+nj_pov <- .35
+
+ca_lep <- .4
+nj_lep <- .4
+
+ca_raceeth <- .75
+nj_raceeth <- .4
+```
+
+```{r indicators}
+ca <- ca %>%
+  mutate(raceeth_indicator = ifelse((!is.na(propHispanicOrNonWhite) & propHispanicOrNonWhite >= ca_raceeth), 1, 0),
+         pov_indicator = ifelse((!is.na(propPoverty) & propPoverty >= ca_pov), 1, 0),
+         lep_indicator = ifelse((!is.na(propLEP) & propLEP >= ca_lep), 1, 0))
+
+nj <- nj %>%
+  mutate(raceeth_indicator = ifelse((!is.na(propHispanicOrNonWhite) & propHispanicOrNonWhite >= nj_raceeth), 1, 0),
+         pov_indicator = ifelse((!is.na(propPoverty) & propPoverty >= nj_pov), 1, 0),
+         lep_indicator = ifelse((!is.na(propLEP) & propLEP >= nj_lep), 1, 0))
+```
+
+What % of block groups are classified as DACs, and how does that break down into % of block groups classified as each of the three things?
+```{r analysis_1}
+# % of block groups classified as DACs
+paste0(round(sum(ca$univariate_DAC)/nrow(ca)*100, 2), "% of block groups in California (", sum(ca$univariate_DAC), "), are classified as DACs")
+paste0(round(sum(nj$univariate_DAC)/nrow(nj)*100, 2), "% of block groups in New Jersey (", sum(nj$univariate_DAC), "), are classified as DACs")
+
+# % of block groups classified as DACs based on poverty
+paste0(round(sum(ca$pov_indicator)/nrow(ca)*100, 2), "% of block groups in California (", sum(ca$pov_indicator), "), are above the poverty threshold")
+paste0(round(sum(nj$pov_indicator)/nrow(nj)*100, 2), "% of block groups in New Jersey (", sum(nj$pov_indicator), "), are above the poverty threshold")
+
+# % of block groups classified as DACs based on race/ethnicity
+paste0(round(sum(ca$raceeth_indicator)/nrow(ca)*100, 2), "% of block groups in California (", sum(ca$raceeth_indicator), "), are above the race/ethnicity threshold")
+paste0(round(sum(nj$raceeth_indicator)/nrow(nj)*100, 2), "% of block groups in New Jersey (", sum(nj$raceeth_indicator), "), are above the race/ethnicity threshold")
+
+# % of block groups classified as DACs based on race/ethnicity
+paste0(round(sum(ca$lep_indicator)/nrow(ca)*100, 2), "% of block groups in California (", sum(ca$lep_indicator), "), are above the linguistic isolation threshold")
+paste0(round(sum(nj$lep_indicator)/nrow(nj)*100, 2), "% of block groups in New Jersey (", sum(nj$lep_indicator), "), are above the linguistic isolation threshold")
+```
+
+What would thresholds in the same quantile be for CA? 
+```{r analysis_2}
+ca_pov_quant <- quantile(ca$propPoverty, 1-c(sum(nj$pov_indicator)/nrow(nj)), na.rm = T)
+paste0("If we set a threshold for poverty in California to capture the same percentage of block",
+       " groups as New Jersey's threshold, we would set the threshold at ", round(ca_pov_quant, 2),
+      " instead of ", ca_pov)
+
+ca_raceeth_quant <- quantile(ca$propHispanicOrNonWhite, 1-c(sum(nj$raceeth_indicator)/nrow(nj)), na.rm = T)
+paste0("If we set a threshold for race/ethnicity in California to capture the same percentage of block",
+       " groups as New Jersey's threshold, we would set the threshold at ", round(ca_raceeth_quant, 2),
+       " instead of ", ca_raceeth)
+
+ca_lep_quant <- quantile(ca$propLEP, 1-c(sum(nj$lep_indicator)/nrow(nj)), na.rm = T)
+paste0("If we set a threshold for linguistic isolation in California to capture the same percentage of block",
+       " groups as New Jersey's threshold, we would set the threshold at ", round(ca_lep_quant, 2),
+       " instead of ", ca_lep)
+```
+
+How far off the mean are thresholds
+```{r analysis_3}
+# mean poverty, and difference to mean poverty in DACs
+paste0("In California, mean poverty level is ", round(mean(ca$propPoverty, na.rm = T), 2), ", and mean poverty in DACs is ",
+       round(mean((ca%>%filter(univariate_DAC==1))$propPoverty, na.rm = T), 2))
+paste0("In New Jersey, mean poverty level is ", round(mean(nj$propPoverty, na.rm = T), 2), ", and mean poverty in DACs is ",
+       round(mean((nj%>%filter(univariate_DAC==1))$propPoverty, na.rm = T), 2))
+
+# mean raceeth, and difference to mean raceeth in DACs
+paste0("In California, mean proportion of Hispanic or non-white people is ", round(mean(ca$propHispanicOrNonWhite, na.rm = T), 2), ", and mean proportion of Hispanic or non-white people in DACs is ",
+       round(mean((ca%>%filter(univariate_DAC==1))$propHispanicOrNonWhite, na.rm = T), 2))
+paste0("In New Jersey, mean proportion of Hispanic or non-white people is ", round(mean(nj$propHispanicOrNonWhite, na.rm = T), 2), ", and mean proportion of Hispanic or non-white people in DACs is ",
+       round(mean((nj%>%filter(univariate_DAC==1))$propHispanicOrNonWhite, na.rm = T), 2))
+
+# mean LEP, and difference to mean LEP in DACs
+paste0("In California, mean linguistic isolation is ", round(mean(ca$propLEP, na.rm = T), 2), ", and mean linguistic isolation in DACs is ",
+       round(mean((ca%>%filter(univariate_DAC==1))$propLEP, na.rm = T), 2))
+paste0("In New Jersey, mean linguistic isolation is ", round(mean(nj$propLEP, na.rm = T), 2), ", and mean linguistic isolation in DACs is ",
+       round(mean((nj%>%filter(univariate_DAC==1))$propLEP, na.rm = T), 2))
+
+```
+
+How far off the median are thresholds
+```{r analysis_3}
+# median poverty, and difference to median poverty in DACs
+paste0("In California, median poverty level is ", round(median(ca$propPoverty, na.rm = T), 2), ", and median poverty in DACs is ",
+       round(median((ca%>%filter(univariate_DAC==1))$propPoverty, na.rm = T), 2))
+paste0("In New Jersey, median poverty level is ", round(median(nj$propPoverty, na.rm = T), 2), ", and median poverty in DACs is ",
+       round(median((nj%>%filter(univariate_DAC==1))$propPoverty, na.rm = T), 2))
+
+# median raceeth, and difference to median raceeth in DACs
+paste0("In California, median proportion of Hispanic or non-white people is ", round(median(ca$propHispanicOrNonWhite, na.rm = T), 2), ", and median proportion of Hispanic or non-white people in DACs is ",
+       round(median((ca%>%filter(univariate_DAC==1))$propHispanicOrNonWhite, na.rm = T), 2))
+paste0("In New Jersey, median proportion of Hispanic or non-white people is ", round(median(nj$propHispanicOrNonWhite, na.rm = T), 2), ", and median proportion of Hispanic or non-white people in DACs is ",
+       round(median((nj%>%filter(univariate_DAC==1))$propHispanicOrNonWhite, na.rm = T), 2))
+
+# median LEP, and difference to median LEP in DACs
+paste0("In California, median linguistic isolation is ", round(median(ca$propLEP, na.rm = T), 2), ", and median linguistic isolation in DACs is ",
+       round(median((ca%>%filter(univariate_DAC==1))$propLEP, na.rm = T), 2))
+paste0("In New Jersey, median linguistic isolation is ", round(median(nj$propLEP, na.rm = T), 2), ", and median linguistic isolation in DACs is ",
+       round(median((nj%>%filter(univariate_DAC==1))$propLEP, na.rm = T), 2))
+
+```
+
+For discussion:
+- How to make this more comparable to CES given that NJ has a very similar proportion of block groups being classified as DACs?
+

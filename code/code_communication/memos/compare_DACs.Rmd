@@ -1,0 +1,150 @@
+---
+title: "compare_DACs"
+author: "Claire Morton"
+date: "10/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tigris)
+library(sf)
+```
+
+## Introduction
+
+This document will produce maps of areas designated as "Disadvantaged Communities" by CES, recalculated CES, and univariate classifications. It will also map the stability of block groups (how many metrics, and which metrics, they are considered DACs in).
+
+```{r data}
+block_group_stability <- read_csv("../../data/data_interim/block_group_stability.csv")
+ces <- read.csv("../../data/data_interim/recalculated_ces_scores.csv") %>%
+  mutate(Census.Tract = paste0("0", Census.Tract))
+
+tract <- tracts(
+  state = "CA",
+  year = 2019
+) %>%
+  select(STATEFP, COUNTYFP, TRACTCE, GEOID, geometry)
+block_group <- block_groups(
+  state = "CA",
+  year = 2019
+) %>%
+  select(STATEFP, COUNTYFP, BLKGRPCE, GEOID, geometry)
+```
+
+```{r clean_data}
+# create sf dataframes to map relevant data
+ces_sf <- merge(tract, ces, by.x = "GEOID", by.y = "Census.Tract") %>%
+  select(GEOID, CES.4.0.Percentile, CES.Percentile.Adjusted, geometry)
+#ces_sf_simpl <- st_simplify(ces_sf,  dTolerance = 100)
+
+block_group_sf <- merge(block_group, block_group_stability, by = "GEOID") %>%
+  select(GEOID, `CES 4.0 Percentile`, `CES Percentile Adjusted`, 
+         univariate_DAC, CES.4.0.DAC, CES.Adj.DAC, 
+         stability, n_DAC, geometry)
+```
+
+## Map DACs
+```{r DACs}
+ggplot(block_group_sf, aes(fill = as.factor(univariate_DAC))) +
+  geom_sf(size = 0) +
+  labs(fill = "Univariate DAC")
+
+ggplot(block_group_sf, aes(fill = as.factor(CES.4.0.DAC))) +
+  geom_sf(size = 0) +
+  labs(fill = "CES 4.0 DAC")
+
+ggplot(block_group_sf, aes(fill = as.factor(CES.Adj.DAC))) +
+  geom_sf(size = 0) +
+  labs(fill = "Adjusted CES DAC")
+```
+
+```{r zoom_DACs}
+sanfrancisco_crop <- st_crop(block_group_sf, xmin = -122.5274, xmax = -122.3134,
+                                 ymin = 37.6827, ymax = 37.84)
+fresno_crop <- st_crop(block_group_sf, xmin = -119.96087, xmax = -119.601115,
+                                 ymin = 36.674969, ymax = 36.889648)
+losangeles_crop <- st_crop(block_group_sf, xmin = -118.5505, xmax = -117.831,
+                           ymin = 33.6836, ymax = 34.2203)
+
+ggplot(sanfrancisco_crop, aes(fill = as.factor(univariate_DAC))) +
+  geom_sf(size = .1) +
+  labs(fill = "Univariate DAC")
+
+ggplot(fresno_crop, aes(fill = as.factor(univariate_DAC))) +
+  geom_sf(size = .1) +
+  labs(fill = "Univariate DAC")
+
+ggplot(losangeles_crop, aes(fill = as.factor(univariate_DAC))) +
+  geom_sf(size = .1) +
+  labs(fill = "Univariate DAC")
+```
+## Map communities only meeting the poverty threshold
+```{r poverty_threshold}
+ggplot(merged, aes(fill = as.factor(pov == 1 & raceeth == 0 & lep == 0))) +
+  geom_sf(size = 0) +
+  labs(fill = "Adjusted CES DAC")
+```
+
+## Map how many univariate thresholds are met by each block group
+```{r univariate_stability}
+merged <- merge(block_group, block_group_stability, by = "GEOID") %>%
+  select(GEOID, 
+         univariate_DAC, 
+         propPoverty, propHispanicOrNonWhite, propLEP, geometry) %>%
+  mutate(n_univariate = 0,
+         n_univariate = ifelse((!is.na(propPoverty) & propPoverty >= .35), 1, 0) + 
+           ifelse((!is.na(propHispanicOrNonWhite) & propHispanicOrNonWhite >= .7), 1, 0) + 
+           ifelse((!is.na(propLEP) & propLEP >= .4), 1, 0),
+         pov = ifelse((!is.na(propPoverty) & propPoverty >= .35), 1, 0),
+         raceeth = ifelse((!is.na(propHispanicOrNonWhite) & propHispanicOrNonWhite >= .7), 1, 0),
+         lep = ifelse((!is.na(propLEP) & propLEP >= .4), 1, 0))
+
+ggplot(merged, aes(fill = as.factor(pov)))+
+  geom_sf(size = 0) +
+  scale_fill_manual(values = c("lightgreen",  "yellow"))+
+  labs(fill = "Poverty qualifying")
+```
+
+```{r map_univariate_stability}
+ggplot(merged, aes(fill = as.factor(n_univariate)))+
+  geom_sf(size = 0) +
+  scale_fill_manual(values = c("lightgreen",  "yellow", "orange", "red"))+
+  labs(fill = "Number of metrics")
+```
+## Map stability of DACs
+```{r stable_DACs}
+ggplot(block_group_sf, aes(fill = as.factor(n_DAC)))+
+  geom_sf(size = 0) +
+  scale_fill_manual(values = c("lightgreen",  "yellow", "orange", "red"))+
+  labs(fill = "Number of metrics")
+```
+## Zoom in for stability of DACs
+```{r stable_DACs_zoomed}
+sanfrancisco_crop <- st_crop(block_group_sf, xmin = -122.5274, xmax = -122.3134,
+                                 ymin = 37.6827, ymax = 37.84)
+fresno_crop <- st_crop(block_group_sf, xmin = -119.96087, xmax = -119.601115,
+                                 ymin = 36.674969, ymax = 36.889648)
+losangeles_crop <- st_crop(block_group_sf, xmin = -118.5505, xmax = -117.831,
+                           ymin = 33.6836, ymax = 34.2203)
+
+ggplot(sanfrancisco_crop, aes(fill = as.factor(n_DAC)))+
+  geom_sf(size = 0) +
+  scale_fill_manual(values = c("lightgreen",  "yellow", "orange", "red"))+
+  labs(fill = "Number of metrics")
+
+ggplot(fresno_crop, aes(fill = as.factor(n_DAC)))+
+  geom_sf(size = 0) +
+  scale_fill_manual(values = c("lightgreen",  "yellow", "orange", "red"))+
+  labs(fill = "Number of metrics")
+
+ggplot(losangeles_crop, aes(fill = as.factor(n_DAC)))+
+  geom_sf(size = 0) +
+  scale_fill_manual(values = c("lightgreen",  "yellow", "orange", "red"))+
+  labs(fill = "Number of metrics")
+```
+
+
+
+
