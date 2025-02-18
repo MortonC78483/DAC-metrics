@@ -71,7 +71,9 @@ merged <- merge(block_group, ces_scores, by.x = "tract", by.y = "GEOID") %>%
   select(GEOID, tract, total_race_eth, 
          nonhispanic_white, nonhispanic_black, nonhispanic_american_indian_alaska_native, 
          nonhispanic_asian, nonhispanic_native_hawaiian_pacific_islander, nonhispanic_other, 
-         nonhispanic_two_or_more, hispanic, total_poverty, over_200_percent_poverty, total_LEP, LEP, pop_density,
+         nonhispanic_two_or_more, hispanic, 
+         White, Black, AmericanIndianAlaskaNative, Asian, NativeHawaiianPacificIslander, Other, TwoOrMore,
+         total_poverty, over_200_percent_poverty, total_LEP, LEP, pop_density,
          cleanup_sites, groundwater_threats, haz_waste, imp_water_bodies, solid_waste, 
          ces_score, ces_perc, ces_score_adj, ces_perc_adj, eji_score, eji_perc,
          univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac, n_dac

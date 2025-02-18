@@ -1,167 +1,126 @@
-## ---------------------------
+# ---------------------------
 ##
 ## Script name: figure_02
 ##
 ## Purpose of script:
-##    Create figure 2, ANOVA results with significance indicators for five metrics
+##    Create figure 2, which shows the number of people who moved from being in a DAC to not being in a DAC
+##    for all metrics.
 ##
 ## Author: Claire Morton
 ##
-## Date Created: 2022-12-30
+## Date Created: 2022-01-11
 ##
 ## Email: mortonc@stanford.edu
 ##
 ## ---------------------------
 ##
 ## Notes:
-##   
+##    
 ##
 ## ---------------------------
 
 # Install packages ---------------------------
 library(readr)
-library(tigris)
 library(tidyverse)
-library(ggplot2) 
-library(sf)
-library(ggpubr)
-library(rstatix)
-library(cowplot)
+library(stargazer) # for table exporting
 
-# function for mean +- standard deviation
-min.mean.sd.max <- function(x) {
-  r <- c(mean(x) - sd(x), mean(x), mean(x) + sd(x))
-  names(r) <- c("ymin", "y", "ymax")
-  r
+# Functions ---------------------------
+# function to append proportion to vector of numbers
+add_perc <- function(data, denom) {
+  return(paste0(data, " (", round(data/denom, 3), ")"))
+}
+
+# function to create table elements
+# we will filter data to places that have 0 people in DACs in metric 2, 
+# and then sum metric 1 to get people in DACs in metric 1 that are no longer
+# in DACs in metric 2
+get_n_diff <- function(data, metric_1, metric_2){
+  return(sum(data[data[metric_2] == 0,][metric_1], na.rm = T))
+}
+
+# function to calculate how many people are classified as disadvantaged
+# by both metrics
+get_n_same <- function(data, metric_1, metric_2){
+  return(sum(data[data[metric_2] > 0,][metric_1], na.rm = T))
 }
 
 # Import data ---------------------------
 data <- read_csv("data/data_processed/metrics_block_group.csv") %>%
-  dplyr::select(total_race_eth, hispanic, nonhispanic_black, pop_density, over_200_percent_poverty, total_poverty,
+  dplyr::select(total_race_eth, 
                 univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac) %>%
-  mutate(poverty_prop = (total_poverty-over_200_percent_poverty)/total_poverty,
-         hispanic_prop = hispanic/total_race_eth,
-         nh_black_prop = nonhispanic_black/total_race_eth,
-         pop_density = pop_density * 1000000) %>% # people/square kilometer
-  dplyr::select(-c(over_200_percent_poverty, total_poverty, total_race_eth, hispanic, nonhispanic_black))
+  as.data.frame %>%
+  mutate(
+    across(-total_race_eth, ~ .*total_race_eth)
+  )
 
-# Format data ---------------------------
-# Create dataset with DAC designation type and variables of interest
-univariate_dac_data <- data %>%
-  dplyr::filter(univariate_dac == 1) %>%
-  mutate(dac = "univariate")
-ces_dac_data <- data %>%
-  dplyr::filter(ces_dac == 1) %>%
-  mutate(dac = "ces")
-ces_dac_adj_data <- data %>%
-  dplyr::filter(ces_dac_adj == 1) %>%
-  mutate(dac = "ces_adj")
-eji_dac_data <- data %>%
-  dplyr::filter(eji_dac == 1) %>%
-  mutate(dac = "eji")
-cejst_dac_data <- data %>%
-  dplyr::filter(cejst_dac == 1) %>%
-  mutate(dac = "cejst")
+metrics <- c("univariate_dac", "ces_dac", "ces_dac_adj", "eji_dac", "cejst_dac")
 
-dac_data <- rbind(univariate_dac_data, ces_dac_data, ces_dac_adj_data, eji_dac_data, cejst_dac_data)
+# Create figure ---------------------------
+fig_data <- data.frame(matrix(ncol = 4, nrow = 10))
+colnames(fig_data) = c('metrics', 'metric1only','both','metric2only')
 
+row = 1;
+for (i in 1:(length(metrics)-1)) {
+  for (j in (i+1):length(metrics)) {
+    fig_data[row,] = c(paste0(metrics[i], metrics[j]), 
+                       get_n_diff(data, metrics[i], metrics[j]),
+                       get_n_same(data, metrics[i], metrics[j]),
+                       get_n_diff(data, metrics[j], metrics[i]))
+    row = row + 1
+  }
+}
 
-# Part a ---------------------------
-one.way <- dac_data %>% anova_test(pop_density ~ dac) #people/square km
-tukey.hsd <- dac_data %>% 
-  tukey_hsd(pop_density ~ dac) %>% 
-  add_xy_position(x = "dac", 
-                  fun = "mean_sd",
-                  step.increase = 0.2)
+fig_data <- data.frame(matrix(ncol = 4, nrow = 10*3))
+colnames(fig_data) = c('metrics', 'type','label', 'val')
 
-# plot
-part_a <- ggplot(aes(y = pop_density, x = factor(dac)), data = dac_data)+
-  xlab("Metric")+
-  ylab("Population Density (People/Square Kilometer)")+
-  scale_x_discrete(labels=c("CEJST", "CES", "CES+", "EJI", "Trivariate"))+
-  stat_summary(fun.data = min.mean.sd.max)+
-  stat_pvalue_manual(tukey.hsd, 
-                     hide.ns = TRUE, 
-                     step.increase = .01, 
-                     tip.length = 0.01)+
-  theme_classic()
-  #geom_jitter(position=position_jitter(width=.2), size=3) 
+names = c("Trivariate", "CES", "CES+", "EJI", "CEJST")
 
-# Part b ---------------------------
-one.way <- dac_data %>% anova_test(poverty_prop ~ dac)
-tukey.hsd <- dac_data %>% 
-  tukey_hsd(poverty_prop ~ dac) %>% 
-  add_xy_position(x = "dac", 
-                  fun = "mean_sd",
-                  step.increase = 0.2)
+row = 1;
+for (i in 1:(length(metrics)-1)) {
+  for (j in (i+1):length(metrics)) {
+    fig_data[row,] = c(paste0(metrics[i], '\n', metrics[j]), 'metric_1', names[i], as.numeric(get_n_diff(data, metrics[i], metrics[j])))
+    row = row + 1
+    fig_data[row,] = c(paste0(metrics[i], '\n',metrics[j]), 'metric_1.5', "Both", as.numeric(get_n_same(data, metrics[i], metrics[j])))
+    row = row + 1
+    fig_data[row,] = c(paste0(metrics[i], '\n',metrics[j]), 'metric_2', names[j], as.numeric(get_n_diff(data, metrics[j], metrics[i])))
+    row = row + 1
+  }
+}
 
-# plot
-part_b <- ggplot(aes(y = poverty_prop, x = factor(dac)), data = dac_data)+
-  xlab("Metric")+
-  ylab("Proportion People in Poverty")+
-  scale_x_discrete(labels=c("CEJST", "CES", "CES+", "EJI", "Trivariate"))+
-  stat_summary(fun.data = min.mean.sd.max)+
-  stat_pvalue_manual(tukey.hsd, 
-                     hide.ns = TRUE, 
-                     step.increase = .01, 
-                     tip.length = 0.01)+
-  theme_classic()
-#geom_jitter(position=position_jitter(width=.2), size=3) 
+fig_data <- fig_data %>%
+  group_by(metrics) %>%
+  arrange(desc(type)) %>%
+  mutate(ratio = as.numeric(val),# / sum(as.numeric(val)),
+         pos = cumsum(ratio) - ratio / 2) %>%
+  ungroup()
 
-# Part c ---------------------------
-one.way <- dac_data %>% anova_test(hispanic_prop ~ dac)
-tukey.hsd <- dac_data %>% 
-  tukey_hsd(hispanic_prop ~ dac) %>% 
-  add_xy_position(x = "dac", 
-                  fun = "mean_sd",
-                  step.increase = 0.2)
+labels <- fig_data %>%
+  arrange(as.numeric(val)) %>%
+  filter(type == "metric_2")
 
-# plot
-part_c <- ggplot(aes(y = hispanic_prop, x = factor(dac)), data = dac_data)+
-  xlab("Metric")+
-  ylab("Proportion Hispanic/Latino People")+
-  scale_x_discrete(labels=c("CEJST", "CES", "CES+", "EJI", "Trivariate"))+
-  stat_summary(fun.data = min.mean.sd.max)+
-  stat_pvalue_manual(tukey.hsd, hide.ns = TRUE, step.increase = .02, tip.length = 0.01)+
-  theme_classic()
-#geom_jitter(position=position_jitter(width=.2), size=3) 
-
-# Part d ---------------------------
-one.way <- dac_data %>% anova_test(nh_black_prop ~ dac)
-tukey.hsd <- dac_data %>% 
-  tukey_hsd(nh_black_prop ~ dac) %>% 
-  add_xy_position(x = "dac", 
-                  fun = "mean_sd",
-                  step.increase = 0.2)
-
-# plot
-part_d <- ggplot(aes(y = nh_black_prop, x = factor(dac)), data = dac_data)+
-  xlab("Metric")+
-  ylab("Proportion Non-Hispanic Black People")+
-  scale_x_discrete(labels=c("CEJST", "CES", "CES+", "EJI", "Trivariate"))+
-  stat_summary(fun.data = min.mean.sd.max)+
-  stat_pvalue_manual(tukey.hsd, hide.ns = TRUE, step.increase = .02, tip.length = 0.01)+
-  theme_classic()
+fig_data$metrics = factor(fig_data$metrics, levels = labels$metrics)
 
 # Arrange figure parts and export ---------------------------
-figure_2 <- cowplot::plot_grid(part_a, part_b, part_c, part_d,
-                               nrow = 2, axis = "tblr", align = "hv", labels = "AUTO")
+figure_2 <- ggplot(fig_data,                         # Draw barplot with grouping & stacking
+                 aes(x = metrics,
+                     y = as.numeric(val)/1000000,
+                     fill = factor(type, 
+                                   level = c('metric_1', 'metric_1.5', 'metric_2')))) + 
+  geom_bar(stat = "identity",
+           position = "stack")+
+  scale_fill_manual(values=c("#cccf7c", "#8fcf7c", "#60bfb2"))+
+  xlab('')+
+  ylab('Number of People (Millions)')+
+  theme_classic()+
+  theme(legend.position='none')+
+  geom_text(aes(y = pos/1000000, label = label), size = 4, color = "black") +
+  coord_flip()+
+  theme(axis.text.y=element_blank(),  #remove y axis labels
+        axis.ticks.y=element_blank(),  #remove y axis ticks
+        axis.line.y = element_blank()
+  )
+    
 cowplot::ggsave2("outputs/figures/fig_2.png", figure_2,
-                 width = 13,
-                 height = 9,
+                 width = 8,
+                 height = 5,
                  units = c("in"))
-
-
-# Drafts/deprecated ---------------------------
-# # Visualization draft: box plots with p-values
-# one.way <- dac_data %>% anova_test(pop_density ~ dac)
-# tukey.hsd <- dac_data %>% tukey_hsd(pop_density ~ dac)
-#
-# tukey.hsd <- tukey.hsd %>% add_xy_position(x = "dac", 
-#                                            step.increase = 0.2)
-# ggboxplot(dac_data, x = "dac", y = "pop_density") +
-#   stat_pvalue_manual(tukey.hsd, hide.ns = T, step.increase = .025) +
-#   labs(
-#     subtitle = get_test_label(one.way, detailed = TRUE),
-#     caption = get_pwc_label(tukey.hsd)
-#   )

@@ -40,9 +40,11 @@ polygons_valid <- st_make_valid(polygons_buffered)
 block_group_sf <- tigris::block_groups(state = "CA", year = 2019) %>%
   select(GEOID, ALAND) %>%
   st_set_crs(crs_nad83)
+st_write(block_group_sf, "data/data_raw/block_groups_2019.shp")
 
 # Intersect block groups with dasymetric data ---------------------------
 # get proportion of each block group that is > buffer distance from populated areas
+#TODO: TRY CONIC ALBERS WITH ST_INTERSECTION
 intersect <- st_intersection(polygons_valid, block_group_sf)
 
 

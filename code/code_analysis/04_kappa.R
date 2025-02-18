@@ -52,9 +52,20 @@ data_frame = data.frame(matrix(ncol = 3, nrow = 0))
 colnames(data_frame) = c("metric1", "metric2", "khat")
 for (i in 1:(length(metric_names)-1)) {
   for (j in (i+1):length(metric_names)) {
-    data_frame[nrow(data_frame) + 1,] = c(metric_names[i], metric_names[j], calc_kappa(metric_names[i], metric_names[j]))
+    data_frame[nrow(data_frame) + 1,] = c(metric_names[i], metric_names[j], calc_kappa2(metric_names[i], metric_names[j]))
   }
 }
 data_frame
 
+# Format table for export ---------------------------
+table_kappa2 <- matrix(nrow = length(metric_names), ncol = length(metric_names), dimnames = list(metric_names, metric_names))
+for (i in 1:(length(metric_names)-1)){ # row
+  for (j  in (i+1):length(metric_names)){ # column
+    val = (data_frame %>%
+      filter(data_frame$metric1 == metric_names[i] & data_frame$metric2 == metric_names[j]))$khat
+    table_kappa2[i, j] = val
+  }
+}
+
+write.csv(table_kappa, "data/data_interim/table_kappa.csv")
 
