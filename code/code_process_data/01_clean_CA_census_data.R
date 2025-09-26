@@ -28,7 +28,9 @@ library(tidyverse)
 library(sf)
 library(tidycensus)
 library(tigris)
-census_api_key("1500bc400a50a2e72050a3658fa50ab5c15f1693", install = TRUE, overwrite = TRUE)
+source("api_keys.R") # creates api_key with key
+
+census_api_key(api_key, install = TRUE, overwrite = TRUE)
 
 # Tract-level data on race and ethnicity ---------------------------
 tract <- get_acs(

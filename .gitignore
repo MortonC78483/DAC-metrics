@@ -2,5 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
- data/
- api_keys.txt
+data/
+api_keys.R
