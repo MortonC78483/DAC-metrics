@@ -45,7 +45,7 @@ get_n_same <- function(data, metric_1, metric_2){
 }
 
 # Import data ---------------------------
-data <- read_csv("data/data_processed/metrics_block_group.csv") %>%
+data <- read_csv("data/data_processed/metrics_tract.csv") %>%
   dplyr::select(total_race_eth, 
                 univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac) %>%
   as.data.frame %>%

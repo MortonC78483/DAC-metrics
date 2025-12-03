@@ -29,7 +29,7 @@ library(sf)
 library(ggpubr)
 
 # Load data ---------------------------
-data <- read.csv("data/data_processed/metrics_block_group.csv")  %>%
+data <- read.csv("data/data_processed/metrics_tract.csv")  %>%
   #dplyr::select(total_race_eth, hispanic, Black, pop_density, over_200_percent_poverty, total_poverty,
   #              univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac, n_dac) %>%
   mutate(poverty_prop = (total_poverty - over_200_percent_poverty)/total_poverty,
@@ -42,27 +42,27 @@ data <- read.csv("data/data_processed/metrics_block_group.csv")  %>%
   #select(GEOID, tract, univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac, n_dac)
 
 # Make plots for characteristics of communities classified rarely, sometimes, and often ---------------------------
-part_a <- ggplot(data, aes(x = factor(n_dac_group), y = black_prop, group = factor(n_dac_group))) +
-  geom_violin() +
-  ylab("Proportion of Black Residents") +
-  xlab("Number of tools classifying as disadvantaged")
-
-part_b <- ggplot(data, aes(x = factor(n_dac_group), y = poverty_prop, group = factor(n_dac_group))) +
-  geom_violin() + 
-  ylab("Proportion of Residents in Poverty") +
-  xlab("Number of tools classifying as disadvantaged")
-
-part_c <- ggplot(data, aes(x = factor(n_dac_group), y = hispanic_prop, group = factor(n_dac_group))) +
-  geom_violin() + 
-  ylab("Proportion of Hispanic Residents") +
-  xlab("Number of tools classifying as disadvantaged")
-  
-ggarrange(part_a, part_b, part_c)
+# part_a <- ggplot(data, aes(x = factor(n_dac_group), y = black_prop, group = factor(n_dac_group))) +
+#   geom_violin() +
+#   ylab("Proportion of Black Residents") +
+#   xlab("Number of tools classifying as disadvantaged")
+# 
+# part_b <- ggplot(data, aes(x = factor(n_dac_group), y = poverty_prop, group = factor(n_dac_group))) +
+#   geom_violin() + 
+#   ylab("Proportion of Residents in Poverty") +
+#   xlab("Number of tools classifying as disadvantaged")
+# 
+# part_c <- ggplot(data, aes(x = factor(n_dac_group), y = hispanic_prop, group = factor(n_dac_group))) +
+#   geom_violin() + 
+#   ylab("Proportion of Hispanic Residents") +
+#   xlab("Number of tools classifying as disadvantaged")
+#   
+# ggarrange(part_a, part_b, part_c)
 
 # Determine which tools are most often classifying communities marked by only 2 or 3 metrics as DACs ---------------------------
 bg_2_or_3 <- data %>%
   filter(n_dac_group == "2 or 3") %>%
-  select(univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac) %>%
+  dplyr::select(univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac) %>%
   colSums(na.rm = T)
 
 # Get the proportion of unstable block group classifications for each tool vs. proportion of total block group classifications
@@ -72,14 +72,14 @@ bg_2_or_3 <- data %>%
 bg_2_or_3/sum(bg_2_or_3)
 
 total_bg <- data %>% 
-  select(univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac) %>%
+  dplyr::select(univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac) %>%
   colSums(na.rm = T)
 total_bg/sum(total_bg)
 
 (bg_2_or_3/sum(bg_2_or_3))/(total_bg/sum(total_bg))
 
 # Get the proportion of a tool's DACs that are classified as DACs by only 2 or 3 metrics total.
-# THIS IS THE TABLE CURRENTLY IN THE PAPER
+# This is the table currently in the paper
 bg_2_or_3/total_bg
 
 # determine the proportion of DACs (from any tool) that are unstably designated
@@ -93,8 +93,9 @@ bg_real_1_or_2 <- data %>%
   mutate(n_dac = ces_dac + cejst_dac+ eji_dac, 
          n_dac_group = ifelse(n_dac == 0, "0", ifelse(n_dac == 3, "3", "1 or 2"))) %>%
   filter(n_dac_group == "1 or 2") %>%
-  select(ces_dac, eji_dac, cejst_dac) %>%
+  dplyr::select(ces_dac, eji_dac, cejst_dac) %>%
   colSums(na.rm = T)
+# This table is in the paper
 bg_real_1_or_2/total_bg[c("ces_dac", "eji_dac", "cejst_dac")]
 
 

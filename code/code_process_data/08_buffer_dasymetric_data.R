@@ -49,12 +49,12 @@ polygons_1km_merged <- st_union(polygons_1km)
 polygons_1km_merged_reprojected <- st_transform(polygons_1km_merged, crs_nad83)
 
 # write data ---------------------------
-st_write(polygons_1km_merged_reprojected, "data/data_interim/populated_areas_1km_buffer.shp")
+st_write(polygons_1km_merged_reprojected, "data/data_interim/populated_areas_1km_buffer.shp", append = FALSE)
 
 # Find out how many block groups don't intersect with the building polygons at all  ---------------------------
 polygons_proj <- st_transform(polygons, crs_albers_projected)
 polygons_cent <- st_centroid(polygons_proj)
-bg <- tigris::block_groups(state = "CA", year = 2019) %>%
+bg <- tigris::tracts(state = "CA", year = 2019) %>%
   st_transform(crs_albers_projected)
 
 p_sp <- as(polygons_cent, Class = "Spatial")

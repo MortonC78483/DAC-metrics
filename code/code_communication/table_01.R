@@ -32,19 +32,18 @@ add_perc <- function(data, denom) {
 }
 
 # Load data ---------------------------
-metrics_block_group <- read.csv("data/data_processed/metrics_block_group.csv")%>%
-  mutate(GEOID = paste0("0", GEOID),
-         tract = paste0("0", tract)) %>%
+metrics_tract <- read.csv("data/data_processed/metrics_tract.csv")%>%
+  mutate(GEOID = paste0("0", GEOID)) %>%
   dplyr::select(GEOID, total_race_eth, ces_dac, ces_dac_adj, univariate_dac, eji_dac, cejst_dac)
 
-block_group <- block_groups(
+tract <- tracts(
   state = "CA",
   year = 2019) %>%
   dplyr::select(ALAND, GEOID, geometry) %>%
   mutate(ALAND = 3.86102e-7 * ALAND) # convert from square meters to square miles
 
 # Merge data ---------------------------
-merged <- merge(metrics_block_group, block_group, by = "GEOID")
+merged <- merge(metrics_tract, tract, by = "GEOID")
 
 # Land area ---------------------------
 land_area <- merged %>%
@@ -53,14 +52,14 @@ land_area <- merged %>%
   dplyr::select(ces_dac, ces_dac_adj, univariate_dac, eji_dac, cejst_dac) %>%
   colSums(na.rm = T) %>%
   round(-2) %>%
-  add_perc(sum(block_group$ALAND))
+  add_perc(sum(tract$ALAND))
 
 # Number of block groups ---------------------------
 # sum number of DAC block groups in all metrics (exclude ID)
-n_block_groups <- merged %>%
+n_tracts <- merged %>%
   dplyr::select(ces_dac, ces_dac_adj, univariate_dac, eji_dac, cejst_dac) %>%
   colSums(na.rm = T) %>%
-  add_perc(nrow(metrics_block_group))
+  add_perc(nrow(metrics_tract))
   
 # Number of people ---------------------------
 n_people <- merged %>%
@@ -69,14 +68,14 @@ n_people <- merged %>%
   dplyr::select(ces_dac, ces_dac_adj, univariate_dac, eji_dac, cejst_dac) %>%
   colSums(na.rm = T) %>%
   round(-2) %>%
-  add_perc(sum(metrics_block_group$total_race_eth))
+  add_perc(sum(metrics_tract$total_race_eth))
 
 # Join into table ---------------------------
 row_names <- c("CES", "CES+", "Trivariate", "EJI", "CEJST")
-table_01 <- data.frame(row_names, land_area, n_block_groups, n_people) %>%
+table_01 <- data.frame(row_names, land_area, n_tracts, n_people)
 colnames(table_01) = c("Metric", 
                        "Land area (proportion)", 
-                       "Number of block groups (proportion)", 
+                       "Number of tracts (proportion)", 
                        "Number of people (proportion)")
 
 stargazer(table_01, 

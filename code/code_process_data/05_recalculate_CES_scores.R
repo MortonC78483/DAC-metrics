@@ -44,7 +44,7 @@ voting <- read.csv("data/data_interim/voting.csv") %>%
 race_eth <- read.csv("data/data_interim/CA_census_tract_race_eth.csv") %>%
   mutate(GEOID = paste0("0", as.character(GEOID)))
 
-ces <- read_excel("data/CES_4.0_data/calenviroscreen40resultsdatadictionaryf2021/calenviroscreen40resultsdatadictionary_F_2021.xlsx") 
+ces <- read_excel("data/data_raw/CES_4.0_data/calenviroscreen40resultsdatadictionaryf2021/calenviroscreen40resultsdatadictionary_F_2021.xlsx") 
 ces <- ces %>%
   mutate('Census Tract' = paste0("0", as.character(ces$'Census Tract')))
 

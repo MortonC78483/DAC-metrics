@@ -27,7 +27,7 @@ library(dataframe)
 library(ggpubr)
 
 # Import data ---------------------------
-data <- read_csv("data/data_processed/metrics_block_group.csv") 
+data <- read_csv("data/data_processed/metrics_tract.csv") 
 
 med_black_prop <- median(data$Black/data$total_race_eth, na.rm = T)
 med_hisp_prop <- median(data$hispanic/data$total_race_eth, na.rm = T)

@@ -3,7 +3,7 @@
 ## Script name: table_03
 ##
 ## Purpose of script:
-##    Calculate table of Spearman's correlation between the metrics
+##    Calculate table of Pearson's correlation between the metrics
 ##
 ## Author: Claire Morton
 ##
@@ -26,7 +26,7 @@ library(sf)
 library(stargazer)
 library(psych)
 # Import data ---------------------------
-data <- read_csv("data/data_processed/metrics_block_group.csv") %>%
+data <- read_csv("data/data_processed/metrics_tract.csv") %>%
   dplyr::select(GEOID, univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac)
 
 # Create table ---------------------------
@@ -38,8 +38,6 @@ for (i in 1:(length(metric_names)-1)) {
     metric_one = metric_names[i]
     metric_two = metric_names[j]
     data_frame[nrow(data_frame) + 1,] = c(metric_names[i], metric_names[j], round(cor(data[metric_one], data[metric_two], method = "pearson", use = "complete.obs"), 3))
-    # tetrachoric
-    #data_frame[nrow(data_frame) + 1,] = c(metric_names[i], metric_names[j], tetrachoric(data[metric_one], data[metric_two]))
     }
 }
 data_frame
@@ -48,8 +46,8 @@ data_frame
 table <- matrix(nrow = length(metric_names), ncol = length(metric_names), dimnames = list(metric_names, metric_names))
 for (i in 1:(length(metric_names)-1)){ # row
   for (j  in (i+1):length(metric_names)){ # column
-    val = round((data_frame %>%
-             filter(data_frame$metric1 == metric_names[i] & data_frame$metric2 == metric_names[j]))$cor, 3)
+    val = round(as.numeric((data_frame %>%
+             filter(data_frame$metric1 == metric_names[i] & data_frame$metric2 == metric_names[j]))$cor), 3)
     table[i, j] = val
   }
 }
@@ -59,8 +57,6 @@ write.csv(table, "data/data_interim/table_03.csv")
 names = c("Trivariate", "CES", "CES+", "EJI", "CEJST")
 rownames = names
 
-table <- table %>%
-  select(-c(...1))
 colnames(table) = names
 table <- round(table, 2)
 rownames(table) = rownames

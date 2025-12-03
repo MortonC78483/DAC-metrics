@@ -25,7 +25,7 @@ library(readr)
 library(tidyverse)
 
 # Import data ---------------------------
-data <- read_csv("data/data_processed/metrics_block_group.csv") %>%
+data <- read_csv("data/data_processed/metrics_tract.csv") %>%
   dplyr::select(total_race_eth, hispanic, pop_density, over_200_percent_poverty, total_poverty,
     univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac) %>%
   mutate(poverty_prop = (total_poverty - over_200_percent_poverty)/total_poverty,

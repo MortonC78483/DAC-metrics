@@ -3,97 +3,79 @@
 ## Script name: figure_05
 ##
 ## Purpose of script:
-##    Create figure 5, proportion of people of various racial/ethnic groups in DACs by metric
+##    This script plots results of the analysis with Wallenius' Hypergeometric distribution
 ##
 ## Author: Claire Morton
 ##
-## Date Created: 2022-01-11
+## Date Created: 2023-05-19
 ##
 ## Email: mortonc@stanford.edu
 ##
 ## ---------------------------
 ##
-## Notes:
-##    
 ##
 ## ---------------------------
 
 # Install packages ---------------------------
 library(readr)
 library(tidyverse)
+library(dataframe)
+library(ggpubr)
 library(cowplot)
-library(MASS) 
-library(reshape2) 
 
 # Import data ---------------------------
-data <- read_csv("data/data_processed/metrics_block_group.csv") %>%
-  dplyr::select(nonhispanic_white, Black, AmericanIndianAlaskaNative, 
-                Asian, NativeHawaiianPacificIslander, 
-                Other, TwoOrMore, hispanic,
-                univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac)%>%
-  mutate(Other= Other+TwoOrMore) %>%
-  dplyr::select(-TwoOrMore)
+toplot_a <- read_csv("data/data_processed/hypergeometric_a.csv")
+toplot_b <- read_csv("data/data_processed/hypergeometric_b.csv")
 
-# Format data ---------------------------
-# Create dataset with DAC designation type and variables of interest
-univariate_dac_data <- data %>%
-  dplyr::filter(univariate_dac == 1) %>%
-  mutate(dac = "univariate")
-ces_dac_data <- data %>%
-  dplyr::filter(ces_dac == 1) %>%
-  mutate(dac = "ces")
-ces_dac_adj_data <- data %>%
-  dplyr::filter(ces_dac_adj == 1) %>%
-  mutate(dac = "ces_adj")
-eji_dac_data <- data %>%
-  dplyr::filter(eji_dac == 1) %>%
-  mutate(dac = "eji")
-cejst_dac_data <- data %>%
-  dplyr::filter(cejst_dac == 1) %>%
-  mutate(dac = "cejst")
-total_data <- data %>%
-  mutate(dac = "total")
+# Colors ---------------------------
+palette <- RColorBrewer::brewer.pal(5, "Dark2")
+palette[1] = "#2caadb"
 
-dac_data <- rbind(univariate_dac_data, ces_dac_data, ces_dac_adj_data, eji_dac_data, cejst_dac_data, total_data) %>%
-  dplyr::select(-c(univariate_dac, ces_dac, ces_dac_adj, eji_dac, cejst_dac))
-
-
-# create table
-table <- dac_data %>%
-  group_by(dac) %>%
-  summarise(across(everything(), sum))
-ex <- melt(table, id = "dac") %>%
-  group_by(dac) %>%
-  mutate(sum = sum(value))
-totals <- ex %>%
-  filter(dac == "total")
-
-# label names
-new.labs <- c("Non-Hispanic White", "Hispanic", 
-              "Black", "American Indian/Alaska Native",
-              "Asian", "Native Hawaiian/Pacific Islander",
-              "Other")
-names(new.labs) <- c("nonhispanic_white", "hispanic", 
-                     "Black", "AmericanIndianAlaskaNative",
-                     "Asian", "NativeHawaiianPacificIslander",
-                     "Other")
-
-figure_5 <- ggplot(ex, aes(fill = variable, y=value/sum, x=dac)) + 
-  geom_bar(stat="identity") +
-  geom_hline(data = totals, aes(yintercept = value/sum), linetype = 2, color = "black")+
-  facet_wrap(~variable, scales ="free", labeller = labeller(variable = new.labs))+
-  coord_flip() +
-  scale_x_discrete(limits = c("univariate", "eji", "cejst", "ces_adj", "ces"),
-                   labels = c("Trivariate", "EJI", "CEJST", "CES+", "CES")) +
-  geom_vline(data = totals, aes(xintercept = value/sum))+
-  scale_fill_brewer(type = "qual", palette = 8)+
-  theme_classic()+
-  ylab("Proportion of Residents of Disadvantaged \nCommunities by Race/Ethnicity")+
+# Make plots ---------------------------
+a<-ggplot(toplot_a, aes(x = as.factor(tool), y = val, group = as.factor(tool), color = as.factor(tool)))+
+  geom_point()+
+  geom_errorbar(aes(ymin = lower, ymax = upper))+
+  scale_color_manual(name = "Screening Tools", values = palette)+
+  ylab("Odds Ratios for Proportion Black People")+
   xlab("Tool")+
-  theme(legend.position = "none")
+  scale_x_discrete(labels = c("CEJST", "CES", "CES+", "EJI", "Trivariate"))+
+  theme_classic()+
+  theme(legend.position = "none")+
+  ylim(0, max(toplot_a$upper))+
+  geom_hline(yintercept = 1, linetype = "dashed")
 
-# Export ---------------------------
-cowplot::ggsave2("outputs/figures/fig_5.png", figure_5,
+b<- ggplot(toplot_b, aes(x = as.factor(tool), y = val, group = as.factor(tool), color = as.factor(tool)))+
+  geom_point()+
+  geom_errorbar(aes(ymin = lower, ymax = upper))+
+  scale_color_manual(name = "Screening Tools", values = palette)+
+  ylab("Odds Ratios for Proportion Hispanic/Latino People")+
+  xlab("Tool")+
+  scale_x_discrete(labels = c("CEJST", "CES", "CES+", "EJI", "Trivariate"))+
+  theme_classic()+
+  theme(legend.position = "none")+
+  ylim(0, max(toplot_b$upper))+
+  geom_hline(yintercept = 1, linetype = "dashed")
+
+# Presentation figure (dark background)
+# ggplot(toplot_b, aes(x = as.factor(tool), y = val, group = as.factor(tool), color = as.factor(tool)))+
+#   geom_point()+
+#   geom_errorbar(aes(ymin = lower, ymax = upper))+
+#   scale_color_brewer(palette = "Set2")+
+#   ylab("Estimated Weights for Proportion Hispanic/Latino People")+
+#   xlab("Tool")+
+#   scale_x_discrete(labels = c("CEJST", "CES", "CES+", "EJI", "Trivariate"))+
+#   theme_classic()+
+#   dark_theme_classic()+
+#   theme(legend.position = "none")
+
+figure_5 <- cowplot::plot_grid(a, b, 
+                               nrow = 1, axis = "tblr", align = "hv", labels = "AUTO")
+
+figure_5
+
+cowplot::ggsave2("outputs/figures/fig_05.png", figure_5,
                  width = 8,
-                 height = 6,
-                 units = c("in"))  
+                 height = 5,
+                 units = c("in"))
+
+

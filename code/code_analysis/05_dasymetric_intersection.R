@@ -37,31 +37,27 @@ polygons_buffered <- read_sf("data/data_interim/populated_areas_1km_buffer.shp")
 polygons_valid <- st_make_valid(polygons_buffered)
 
 # load tigris shapefiles
-block_group_sf <- tigris::block_groups(state = "CA", year = 2019) %>%
+tract_sf <- tigris::tracts(state = "CA", year = 2019) %>%
   select(GEOID, ALAND) %>%
   st_set_crs(crs_nad83)
-st_write(block_group_sf, "data/data_raw/block_groups_2019.shp")
+st_write(tract_sf, "data/data_raw/tracts_2019.shp", 
+         append = FALSE)
 
 # Intersect block groups with dasymetric data ---------------------------
 # get proportion of each block group that is > buffer distance from populated areas
-#TODO: TRY CONIC ALBERS WITH ST_INTERSECTION
-intersect <- st_intersection(polygons_valid, block_group_sf)
-
+intersect <- st_intersection(polygons_valid, tract_sf)
 
 #write.csv(intersect %>% st_drop_geometry(), "intersection_file.csv")
-block_group_sf <- block_group_sf %>%
-  mutate(area_bg = st_area(.) %>% as.numeric())
+tract_sf <- tract_sf %>%
+  mutate(area_tract = st_area(.) %>% as.numeric())
 
 areas <- intersect %>% 
   mutate(area_intersect = st_area(.) %>% as.numeric()) %>%
   st_drop_geometry()
-areas <- merge(areas, block_group_sf) %>%
-  mutate(prop_1km_populated = area_intersect/area_bg) %>%
-  select(GEOID, area_bg, area_intersect, prop_1km_populated)
+areas <- merge(areas, tract_sf) %>%
+  mutate(prop_1km_populated = area_intersect/area_tract) %>%
+  select(GEOID, area_tract, area_intersect, prop_1km_populated)
 
-write.csv(areas, "data/data_interim/dasymetric_intersection_1km.csv")
- 
-# What proportion of land classified as being in DACs by all metrics is > buffer length from people ---------------------------
-
+write.csv(areas, "data/data_interim/dasymetric_intersection_tract_1km.csv")
 
 

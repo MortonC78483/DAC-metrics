@@ -22,8 +22,8 @@
 library(tidyverse)
 
 # Load data
-block_group <- get_acs(
-  geography = "block group",
+tract <- get_acs(
+  geography = "tract",
   variables = c("B02001_001", "B02001_002", "B02001_003", "B02001_004", 
                 "B02001_005", "B02001_006", "B02001_007", "B02001_008",
                 "B03001_003", "B03002_003",
@@ -62,9 +62,9 @@ block_group <- get_acs(
          propLEP = (LEP) / TotalLEP,
          percentile_LEP = percent_rank(propLEP)) 
 # create univariate DAC designation (actual New Jersey law thresholds)
-block_group <- block_group %>%
+tract <- tract %>%
   mutate(univariate_DAC = ifelse(((!is.na(propHispanicOrNonWhite) & propHispanicOrNonWhite >= .40) | 
                                     (!is.na(propPoverty) & propPoverty >= .35) | 
                                     (!is.na(propLEP) & propLEP >= .40)), 1, 0))
 # Write data ------------------------------------------------------
-write_csv(block_group, "data/data_interim/NJ_census_block_group.csv")
+write_csv(tract, "data/data_interim/NJ_census_tract.csv")
