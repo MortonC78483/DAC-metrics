@@ -23,17 +23,20 @@
 # Install packages ---------------------------
 library(readr)
 library(tidyverse)
-library(dataframe)
+#library(dataframe)
 library(ggpubr)
 
 # Import data ---------------------------
 data <- read_csv("data/data_processed/metrics_tract.csv") 
+cafo_data <- read_csv("data/data_interim/census_tract_cafos.csv") %>%
+  dplyr::select(-`...1`)
+data <- merge(data, cafo_data)
 
 med_black_prop <- median(data$Black/data$total_race_eth, na.rm = T)
 med_hisp_prop <- median(data$hispanic/data$total_race_eth, na.rm = T)
 
 above_med_black <- data %>%
-  filter(data$Black/data$total_race_eth >= med_black_prop)
+  dplyr::filter(data$Black/data$total_race_eth >= med_black_prop)
 above_med_black_ces <- sum(above_med_black$ces_dac, na.rm = T)         
 above_med_black_ces_adj <- sum(above_med_black$ces_dac_adj, na.rm = T)         
 above_med_black_eji <- sum(above_med_black$eji_dac, na.rm = T)         
@@ -47,6 +50,15 @@ above_med_hisp_ces_adj <- sum(above_med_hisp$ces_dac_adj, na.rm = T)
 above_med_hisp_eji <- sum(above_med_hisp$eji_dac, na.rm = T)         
 above_med_hisp_cejst <- sum(above_med_hisp$cejst_dac, na.rm = T)         
 above_med_hisp_trivariate <- sum(above_med_hisp$univariate_dac, na.rm = T)         
+
+# CAFO
+cafo_exposed <- data %>%
+  filter(data$scaled_cafo_score > 0)
+cafo_ces <- sum(cafo_exposed$ces_dac, na.rm = T)         
+cafo_ces_adj <- sum(cafo_exposed$ces_dac_adj, na.rm = T)         
+cafo_eji <- sum(cafo_exposed$eji_dac, na.rm = T)         
+cafo_cejst <- sum(cafo_exposed$cejst_dac, na.rm = T)         
+cafo_trivariate <- sum(cafo_exposed$univariate_dac, na.rm = T)         
 
 # Now, our "urn" (California), contains nrow(above_med_x) block groups above median
 # and nrow(data)-nrow(above_med_x) block groups below median, so these are our m1 and m2
@@ -63,25 +75,6 @@ solve_wallenius <- function(m1, m2, mu, n){
   denom = log(1-((n-mu)/m2))
   return(num/denom)
 }
-
-# calculate weights for all metrics
-# proportion Black
-m1 = nrow(above_med_black)
-m2 = nrow(data)-nrow(above_med_black)
-solve_wallenius(m1, m2, above_med_black_ces, sum(data$ces_dac == 1, na.rm = T))
-solve_wallenius(m1, m2, above_med_black_ces_adj, sum(data$ces_dac_adj == 1, na.rm = T))
-solve_wallenius(m1, m2, above_med_black_cejst, sum(data$cejst_dac == 1, na.rm = T))
-solve_wallenius(m1, m2, above_med_black_eji, sum(data$eji_dac == 1, na.rm = T))
-solve_wallenius(m1, m2, above_med_black_trivariate, sum(data$univariate_dac == 1, na.rm = T))
-
-# proportion Hispanic
-m1 = nrow(above_med_hisp)
-m2 = nrow(data)-nrow(above_med_hisp)
-solve_wallenius(m1, m2, above_med_hisp_ces, sum(data$ces_dac == 1, na.rm = T))
-solve_wallenius(m1, m2, above_med_hisp_ces_adj, sum(data$ces_dac_adj == 1, na.rm = T))
-solve_wallenius(m1, m2, above_med_hisp_cejst, sum(data$cejst_dac == 1, na.rm = T))
-solve_wallenius(m1, m2, above_med_hisp_eji, sum(data$eji_dac == 1, na.rm = T))
-solve_wallenius(m1, m2, above_med_hisp_trivariate, sum(data$univariate_dac == 1, na.rm = T))
 
 ## Putting Confidence Intervals on Estimated Weights --------------------------------------------
 # Bootstrapping --------------------------------------------
@@ -101,11 +94,19 @@ w_ces_adj_black = c()
 w_cejst_black = c()
 w_eji_black = c()
 w_trivariate_black = c()
+
 w_ces_hisp = c()
 w_ces_adj_hisp = c()
 w_cejst_hisp = c()
 w_eji_hisp = c()
 w_trivariate_hisp = c()
+
+w_ces_cafo = c()
+w_ces_adj_cafo = c()
+w_cejst_cafo = c()
+w_eji_cafo = c()
+w_trivariate_cafo = c()
+
 for (i in c(1:M)){
   # create a boostrap sample
   sample <- data[sample(nrow(data), nrow(data), replace = T),]
@@ -128,6 +129,14 @@ for (i in c(1:M)){
   above_med_hisp_cejst <- sum(above_med_hisp$cejst_dac, na.rm = T)         
   above_med_hisp_trivariate <- sum(above_med_hisp$univariate_dac, na.rm = T)   
   
+  cafo_exposed <- sample %>%
+    filter(sample$scaled_cafo_score > 0)
+  cafo_ces <- sum(cafo_exposed$ces_dac, na.rm = T)         
+  cafo_ces_adj <- sum(cafo_exposed$ces_dac_adj, na.rm = T)         
+  cafo_eji <- sum(cafo_exposed$eji_dac, na.rm = T)         
+  cafo_cejst <- sum(cafo_exposed$cejst_dac, na.rm = T)         
+  cafo_trivariate <- sum(cafo_exposed$univariate_dac, na.rm = T)         
+  
   # calculate weights for all metrics
   # proportion Black
   m1 = nrow(above_med_black)
@@ -146,14 +155,28 @@ for (i in c(1:M)){
   w_cejst_hisp = append(w_cejst_hisp, c(solve_wallenius(m1, m2, above_med_hisp_cejst, sum(sample$cejst_dac == 1, na.rm = T))))
   w_eji_hisp = append(w_eji_hisp, c(solve_wallenius(m1, m2, above_med_hisp_eji, sum(sample$eji_dac == 1, na.rm = T))))
   w_trivariate_hisp = append(w_trivariate_hisp, c(solve_wallenius(m1, m2, above_med_hisp_trivariate, sum(sample$univariate_dac == 1, na.rm = T))))
+  
+  # CAFO exposure
+  m1 = nrow(cafo_exposed)
+  m2 = nrow(sample)-m1
+  w_ces_cafo = append(w_ces_cafo, c(solve_wallenius(m1, m2, cafo_ces, sum(sample$ces_dac == 1, na.rm = T))))
+  w_ces_adj_cafo = append(w_ces_adj_cafo, c(solve_wallenius(m1, m2, cafo_ces_adj, sum(sample$ces_dac_adj == 1, na.rm = T))))
+  w_cejst_cafo = append(w_cejst_cafo, c(solve_wallenius(m1, m2, cafo_cejst, sum(sample$cejst_dac == 1, na.rm = T))))
+  w_eji_cafo = append(w_eji_cafo, c(solve_wallenius(m1, m2, cafo_eji, sum(sample$eji_dac == 1, na.rm = T))))
+  w_trivariate_cafo = append(w_trivariate_cafo, c(solve_wallenius(m1, m2, cafo_trivariate, sum(sample$univariate_dac == 1, na.rm = T))))
 }
 
 # Calculation of intervals --------------------------------------------
+data <- read_csv("data/data_processed/metrics_tract.csv") 
+cafo_data <- read_csv("data/data_interim/census_tract_cafos.csv") %>%
+  dplyr::select(-`...1`)
+data <- merge(data, cafo_data)
+
 med_black_prop <- median(data$Black/data$total_race_eth, na.rm = T)
 med_hisp_prop <- median(data$hispanic/data$total_race_eth, na.rm = T)
 
 above_med_black <- data %>%
-  filter(data$Black/data$total_race_eth >= med_black_prop)
+  dplyr::filter(data$Black/data$total_race_eth >= med_black_prop)
 above_med_black_ces <- sum(above_med_black$ces_dac, na.rm = T)         
 above_med_black_ces_adj <- sum(above_med_black$ces_dac_adj, na.rm = T)         
 above_med_black_eji <- sum(above_med_black$eji_dac, na.rm = T)         
@@ -168,12 +191,13 @@ above_med_hisp_eji <- sum(above_med_hisp$eji_dac, na.rm = T)
 above_med_hisp_cejst <- sum(above_med_hisp$cejst_dac, na.rm = T)         
 above_med_hisp_trivariate <- sum(above_med_hisp$univariate_dac, na.rm = T)         
 
-# Solves for weight in Wallenius's hypergeometric distribution, given other parameters
-solve_wallenius <- function(m1, m2, mu, n){
-  num = log(1-(mu/m1))
-  denom = log(1-((n-mu)/m2))
-  return(num/denom)
-}
+cafo_exposed <- data %>%
+  filter(data$scaled_cafo_score > 0)
+cafo_ces <- sum(cafo_exposed$ces_dac, na.rm = T)
+cafo_ces_adj <- sum(cafo_exposed$ces_dac_adj, na.rm = T)
+cafo_eji <- sum(cafo_exposed$eji_dac, na.rm = T)
+cafo_cejst <- sum(cafo_exposed$cejst_dac, na.rm = T)
+cafo_trivariate <- sum(cafo_exposed$univariate_dac, na.rm = T)
 
 # When we have M bootstrap weights, we will calculate a 95% confidence interval by computing 
 # [w - q(1-alpha/2)(w*-w), w - q(alpha/2)(w*-w)] where q(x)(w*-w) represents the xth quantile
@@ -220,6 +244,27 @@ conf_ints_hisp = cbind(conf_ints_hisp, "eji" = c(w - quantile(w_eji_hisp-w, 1-al
 w = solve_wallenius(m1, m2, above_med_hisp_trivariate, sum(data$univariate_dac == 1, na.rm = T))
 conf_ints_hisp = cbind(conf_ints_hisp, "trivariate" = c(w - quantile(w_trivariate_hisp-w, 1-alpha/2), w, w - quantile(w_trivariate_hisp-w, alpha/2)))
 
+# CAFO exposure
+m1 = nrow(cafo_exposed)
+m2 = nrow(data)-m1
+alpha = .05
+
+conf_ints_cafo <- c()
+w = solve_wallenius(m1, m2, cafo_ces, sum(data$ces_dac == 1, na.rm = T))
+conf_ints_cafo = cbind(conf_ints_cafo, "ces" = c(w - quantile(w_ces_cafo-w, 1-alpha/2), w, w - quantile(w_ces_cafo-w, alpha/2)))
+
+w = solve_wallenius(m1, m2, cafo_ces_adj, sum(data$ces_dac_adj == 1, na.rm = T))
+conf_ints_cafo = cbind(conf_ints_cafo, "ces_adj" = c(w - quantile(w_ces_adj_cafo-w, 1-alpha/2), w, w - quantile(w_ces_adj_cafo-w, alpha/2)))
+
+w = solve_wallenius(m1, m2, cafo_cejst, sum(data$cejst_dac == 1, na.rm = T))
+conf_ints_cafo = cbind(conf_ints_cafo, "cejst" = c(w - quantile(w_cejst_cafo-w, 1-alpha/2), w, w - quantile(w_cejst_cafo-w, alpha/2)))
+
+w = solve_wallenius(m1, m2, cafo_eji, sum(data$eji_dac == 1, na.rm = T))
+conf_ints_cafo = cbind(conf_ints_cafo, "eji" = c(w - quantile(w_eji_cafo-w, 1-alpha/2), w, w - quantile(w_eji_cafo-w, alpha/2)))
+
+w = solve_wallenius(m1, m2, cafo_trivariate, sum(data$univariate_dac == 1, na.rm = T))
+conf_ints_cafo = cbind(conf_ints_cafo, "trivariate" = c(w - quantile(w_trivariate_cafo-w, 1-alpha/2), w, w - quantile(w_trivariate_cafo-w, alpha/2)))
+
 
 # Write the confidence interval data ----------------------------------------
 toplot_a <- as.data.frame(t(conf_ints_black)) %>%
@@ -236,3 +281,9 @@ toplot_b <- as.data.frame(t(conf_ints_hisp)) %>%
 toplot_b$tool <- row.names(toplot_b)
 write_csv(toplot_b, "data/data_processed/hypergeometric_b.csv")
 
+toplot_cafo <- as.data.frame(t(conf_ints_cafo)) %>%
+  rename("val" = "V2",
+         "lower" = "97.5%",
+         "upper" = "2.5%")
+toplot_cafo$tool <- row.names(toplot_cafo)
+write_csv(toplot_cafo, "data/data_processed/hypergeometric_cafo.csv")

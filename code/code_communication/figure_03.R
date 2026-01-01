@@ -49,7 +49,7 @@ create_plot <- function(data, var_percentile, var_to_plot, cut_points = seq(0, 1
   plot_a = ggplot(data_to_plot) +
     geom_point(aes(x = cut, y = mean), stat = "identity") +
     xlab("")+
-    ylab("Proportion of block groups in disadvantaged communities") +
+    ylab("Proportion of Tracts in disadvantaged communities") +
     theme_classic()
   
   # plot_b = ggplot(data_to_plot) +
@@ -95,7 +95,7 @@ part_a <- ggplot(data = density_data, aes(x = cut, y = mean, group = metric, col
   theme_classic()+
   scale_color_manual(name = "Screening Tools", values = palette)+
   scale_x_discrete(breaks = seq(5, 100, by = 10))+
-  ylab("Proportion of block groups\nin Disadvantaged Communities")+
+  ylab("Proportion of Tracts\nin Disadvantaged Communities")+
   xlab("Population Density (Percentile)")+
   ylim(0, 1)
 
@@ -118,7 +118,7 @@ part_b <- ggplot(data = pov_data, aes(x = cut, y = mean, group = metric, color =
   theme_classic()+
   scale_color_manual(name = "Screening Tools", values = palette)+
   scale_x_discrete(breaks = seq(5, 100, by = 10))+
-  ylab("Proportion of block groups\nin Disadvantaged Communities")+
+  ylab("Proportion of Tracts\nin Disadvantaged Communities")+
   xlab("Percentage of Households in Poverty (Percentile)")+
   ylim(0, 1)
 
@@ -142,7 +142,7 @@ part_c <- ggplot(data = density_data, aes(x = cut, y = mean, group = metric, col
   theme_classic()+
   scale_color_manual(name = "Screening Tools", values = palette)+
   scale_x_discrete(breaks = seq(5, 100, by = 10))+
-  ylab("Proportion of block groups\nin Disadvantaged Communities")+
+  ylab("Proportion of Tracts\nin Disadvantaged Communities")+
   xlab("Proportion Hispanic/Latino Residents (Percentile)")+
   ylim(0, 1)
 
@@ -167,8 +167,8 @@ part_d <- ggplot(data = density_data, aes(x = as.numeric(as.character(cut)), y =
   theme_classic()+
   scale_color_manual(name = "Screening Tools", values = palette)+
   scale_x_continuous(breaks = seq(5, 100, by = 10))+
-  ylab("Proportion of block groups\nin Disadvantaged Communities")+
-  xlab("Proportion Black Residents in Block Groups \nwith >0 Black Residents (Percentile)")+
+  ylab("Proportion of Tracts\nin Disadvantaged Communities")+
+  xlab("Proportion Black Residents in Tracts \nwith >0 Black Residents (Percentile)")+
   ylim(0, 1)
   
 # extract a legend that is laid out horizontally
